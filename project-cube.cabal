@@ -1,0 +1,48 @@
+cabal-version:      2.4
+name:               project-cube
+version:            0.1.0.0
+synopsis:
+homepage:           https://github.com/ConnorDillon/project-cube
+license:            GPL-3.0-or-later
+license-file:       LICENSE
+author:             Connor Dillon
+maintainer:         connor@cdillon.nl
+
+common base
+  default-language:
+    Haskell2010
+  build-depends:
+    base ^>= 4.16.4.0,
+    text ^>= 2.0.2,
+    megaparsec ^>=9.3.0,
+    parser-combinators ^>=1.3.0,
+  default-extensions:
+    OverloadedStrings
+
+library
+    import:           base
+    exposed-modules:
+      Language.Lambda
+      Language.Lambda.Term
+      Language.Lambda.Parser
+    other-modules:
+      Language.Lambda.Parser.Lexer
+    hs-source-dirs:   src
+
+executable cube
+    import:           base
+    main-is:          Main.hs
+    build-depends:
+        project-cube
+    hs-source-dirs:   app
+
+test-suite cube-test
+    import:           base
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   test
+    main-is:          Test.hs
+    build-depends:
+        project-cube,
+        hspec ^>=2.10.10,
+        QuickCheck ^>=2.14.2,
+        hspec-megaparsec ^>=2.2.0
