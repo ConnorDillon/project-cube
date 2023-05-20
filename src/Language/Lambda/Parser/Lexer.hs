@@ -1,5 +1,5 @@
 module Language.Lambda.Parser.Lexer
-  ( Parser, lambdaChar, dot, lparen, rparen, chars ) where
+  ( Parser, lambdaSym, dot, lparen, rparen, chars, let', bind, in' ) where
 
 import Data.Text ( Text )
 import qualified Data.Text as Text
@@ -22,8 +22,8 @@ lexeme = L.lexeme sc
 symbol :: Text -> Parser Text
 symbol = L.symbol sc
 
-lambdaChar :: Parser Text
-lambdaChar = symbol "\\" <|> "λ"
+lambdaSym :: Parser Text
+lambdaSym = symbol "\\" <|> "λ"
 
 dot :: Parser Text
 dot = symbol "."
@@ -33,6 +33,15 @@ lparen = symbol "("
 
 rparen :: Parser Text
 rparen = symbol ")"
+
+let' :: Parser Text
+let' = symbol "let"
+
+bind :: Parser Text
+bind = symbol "="
+
+in' :: Parser Text
+in' = symbol "in"
 
 chars :: Parser Text
 chars = lexeme $ Text.pack <$> some letterChar

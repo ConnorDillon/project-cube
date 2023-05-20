@@ -1,13 +1,16 @@
 module Language.Lambda.Parser ( Parser, parse ) where
 
 import Language.Lambda.Term ( Lambda(..) )
-import Language.Lambda.Parser.Lexer ( Parser, lambdaChar, dot, lparen, rparen, chars )
+import Language.Lambda.Parser.Lexer
+  ( Parser, lambdaSym, dot, lparen, rparen, chars, let', bind, in' )
 
 import Data.Text ( Text )
 import qualified Data.Text as Text
+import qualified Data.Set as Set
 import Data.Void ( Void )
 import Text.Megaparsec
     ( many,
+      some,
       between,
       choice,
       ParseErrorBundle,
@@ -15,19 +18,38 @@ import Text.Megaparsec
       MonadParsec(eof, try) )
 import qualified Text.Megaparsec as MP
 
+keywords :: Set.Set Text
+keywords = Set.fromList ["let", "in"]
+
 var :: Parser Lambda
-var = fmap Var chars
+var = try $ do
+  x <- chars
+  if Set.member x keywords
+    then fail $ "Keyword: " ++ Text.unpack x
+    else return $ Var x
+
+letAbst :: Parser Lambda
+letAbst = do
+  let'
+  name <- chars
+  params <- many chars
+  bind
+  val <- term
+  in'
+  expr <- term
+  return $ App (Abs name expr) $ foldl (.) id (map Abs params) val
 
 abst :: Parser Lambda
 abst = do
-  lambdaChar
-  x <- chars
+  lambdaSym
+  x <- some chars
   dot
-  Abs x <$> term
+  foldl (.) id (map Abs x) <$> term
 
 notAppl :: Parser Lambda
 notAppl = choice
   [ between lparen rparen term
+  , letAbst
   , abst
   , var
   ]

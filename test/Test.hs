@@ -30,10 +30,18 @@ main = hspec $ do
       "λx.x" `shouldParseTo` "(λx.x)"
       "λx.λy.x y" `shouldParseTo` "(λx.(λy.(x y)))"
       "λx.λy.λz.x y z" `shouldParseTo` "(λx.(λy.(λz.((x y) z))))"
+      "λx y z.x y z" `shouldParseTo` "(λx.(λy.(λz.((x y) z))))"
       "λx.x λy.y" `shouldParseTo` "(λx.(x (λy.y)))"
       "(λx.x) λy.y" `shouldParseTo` "((λx.x) (λy.y))"
     it "handles lambda backslash" $ do
       "\\x.x" `shouldParseTo` "(λx.x)"
+    it "parses let expressions" $ do
+      "let x = y in z" `shouldParseTo` "((λx.z) y)"
+      "let f = λx.x in f x" `shouldParseTo` "((λf.(f x)) (λx.x))"
+      "let f x = x in f x" `shouldParseTo` "((λf.(f x)) (λx.x))"
+      "let f x y = x y in f x" `shouldParseTo` "((λf.(f x)) (λx.(λy.(x y))))"
+      "let x = y in let a = b in c" `shouldParseTo` "((λx.((λa.c) b)) y)"
+      "let f x = x in let y = z in f y" `shouldParseTo` "((λf.((λy.(f y)) z)) (λx.x))"
 
   describe "interpreter" $ do
     it "does alpha conversion" $ do
@@ -45,5 +53,8 @@ main = hspec $ do
     it "does one step beta reduction" $ do
       (betaReduceStep, "(λx.x) y") `shouldResultIn'` "y"
       (betaReduceStep, "(λx.x) (λx.x) y") `shouldResultIn'` "((λx.x) y)"
+      (betaReduceStep, "(λf.f x) λx.x") `shouldResultIn'` "((λx.x) x)"
     it "does many step beta reduction" $ do
+      "x y" `shouldReduceTo` "(x y)"
       "(λx.x) (λy.y) z" `shouldReduceTo` "z"
+      "let f x = x in let y = z in f y" `shouldReduceTo` "z"
