@@ -58,3 +58,6 @@ main = hspec $ do
       "x y" `shouldReduceTo` "(x y)"
       "(λx.x) (λy.y) z" `shouldReduceTo` "z"
       "let f x = x in let y = z in f y" `shouldReduceTo` "z"
+    it "does automatic alpha conversion during beta reduction" $ do
+      (betaReduceStep, "(λy x.y x) x") `shouldResultIn'` "(λx'.(x x'))"
+      "(λy x.y x) x y" `shouldReduceTo` "(x y)"
