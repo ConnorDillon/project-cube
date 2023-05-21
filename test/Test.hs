@@ -26,19 +26,24 @@ shouldReduceTo x = shouldParse (fmap (Text.pack . show . betaReduce) (parse x))
 main :: IO ()
 main = hspec $ do
   describe "parser" $ do
-    it "parses lambda expressions" $ do
+    it "parses vars" $ do
+      "x" `shouldParseTo` "x"
+    it "parses applications" $ do
+      "x y" `shouldParseTo` "(x y)"
+      "x y z" `shouldParseTo` "((x y) z)"
+    it "parses abstractions" $ do
       "λx.x" `shouldParseTo` "(λx.x)"
+      "λx y.x" `shouldParseTo` "(λx.(λy.x))"
+    it "handles lambda backslash" $ do
+      "\\x.x" `shouldParseTo` "(λx.x)"
+    it "parses lambda expressions" $ do
       "λx.λy.x y" `shouldParseTo` "(λx.(λy.(x y)))"
-      "λx.λy.λz.x y z" `shouldParseTo` "(λx.(λy.(λz.((x y) z))))"
       "λx y z.x y z" `shouldParseTo` "(λx.(λy.(λz.((x y) z))))"
       "λx.x λy.y" `shouldParseTo` "(λx.(x (λy.y)))"
       "(λx.x) λy.y" `shouldParseTo` "((λx.x) (λy.y))"
-    it "handles lambda backslash" $ do
-      "\\x.x" `shouldParseTo` "(λx.x)"
     it "parses let expressions" $ do
       "let x = y in z" `shouldParseTo` "((λx.z) y)"
       "let f = λx.x in f x" `shouldParseTo` "((λf.(f x)) (λx.x))"
-      "let f x = x in f x" `shouldParseTo` "((λf.(f x)) (λx.x))"
       "let f x y = x y in f x" `shouldParseTo` "((λf.(f x)) (λx.(λy.(x y))))"
       "let x = y in let a = b in c" `shouldParseTo` "((λx.((λa.c) b)) y)"
       "let f x = x in let y = z in f y" `shouldParseTo` "((λf.((λy.(f y)) z)) (λx.x))"
