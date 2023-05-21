@@ -1,8 +1,7 @@
 module Language.Lambda.Parser ( Parser, parse ) where
 
-import Language.Lambda.Term ( Lambda(..) )
+import Language.Lambda.Term ( Lambda(..), Type(..) )
 import Language.Lambda.Parser.Lexer
-  ( Parser, lambdaSym, dot, lparen, rparen, chars, let', bind, in' )
 
 import Data.Text ( Text )
 import qualified Data.Text as Text
@@ -11,6 +10,7 @@ import Data.Void ( Void )
 import Text.Megaparsec
     ( many,
       some,
+      optional,
       between,
       choice,
       ParseErrorBundle,
@@ -28,23 +28,42 @@ var = try $ do
     then fail $ "Keyword: " ++ Text.unpack x
     else return $ Var x
 
+type' :: Parser Type
+type' = between lparen rparen type'
+  <|> arr
+  <|> fmap Type chars
+  where
+    arr = try $ do
+      x <- chars
+      arrow
+      Arrow (Type x) <$> type'
+
+binding :: Parser (Text, Maybe Type)
+binding = do
+  x <- chars
+  y <- optional $ colon >> type'
+  return (x, y)
+
+foldAbst :: [(Text, Maybe Type)] -> Lambda -> Lambda
+foldAbst bindings = foldl (.) id (map (uncurry Abs) bindings)
+
 letAbst :: Parser Lambda
 letAbst = do
   let'
-  name <- chars
-  params <- many chars
+  (name, ty) <- binding
+  bindings <- many binding
   bind
   val <- term
   in'
   expr <- term
-  return $ App (Abs name expr) $ foldl (.) id (map Abs params) val
+  return $ App (Abs name ty expr) $ foldAbst bindings val
 
 abst :: Parser Lambda
 abst = do
   lambdaSym
-  x <- some chars
+  bindings <- some binding
   dot
-  foldl (.) id (map Abs x) <$> term
+  foldAbst bindings <$> term
 
 notAppl :: Parser Lambda
 notAppl = choice

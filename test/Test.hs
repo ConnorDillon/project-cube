@@ -47,6 +47,14 @@ main = hspec $ do
       "let f x y = x y in f x" `shouldParseTo` "((λf.(f x)) (λx.(λy.(x y))))"
       "let x = y in let a = b in c" `shouldParseTo` "((λx.((λa.c) b)) y)"
       "let f x = x in let y = z in f y" `shouldParseTo` "((λf.((λy.(f y)) z)) (λx.x))"
+    it "parses typed expressions" $ do
+      "λx:T.x" `shouldParseTo` "(λx:T.x)"
+      "λf:(T->T) x:T.f x" `shouldParseTo` "(λf:(T->T).(λx:T.(f x)))"
+      "λx:T->U->V.x" `shouldParseTo` "(λx:(T->(U->V)).x)"
+      "let x:T = y in x" `shouldParseTo` "((λx:T.x) y)"
+      "let f:(T -> T) x = x in f y" `shouldParseTo` "((λf:(T->T).(f y)) (λx.x))"
+      "let f x:T = x in f y" `shouldParseTo` "((λf.(f y)) (λx:T.x))"
+      "let f:(T -> T) x:T = x in f y" `shouldParseTo` "((λf:(T->T).(f y)) (λx:T.x))"
 
   describe "interpreter" $ do
     it "does alpha conversion" $ do
