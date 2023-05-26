@@ -1,8 +1,7 @@
 module Main (main) where
 
-import Language.Lambda.Parser ( parse )
+import Language.Lambda.Parser
 import Language.Lambda.Term
-  ( Lambda(..), alphaConvert, freeVars, betaReduceStep, betaReduce )
 
 import Data.Text ( Text )
 import qualified Data.Text as Text
@@ -14,10 +13,10 @@ import qualified Data.Set as Set
 shouldParseTo :: Text -> Text -> IO ()
 shouldParseTo = shouldParse . fmap (Text.pack . show) . parse
 
-shouldResultIn :: (Eq a,Show a) => (Lambda -> a, Text) -> a -> IO ()
+shouldResultIn :: (Eq a, Show a) => (Lambda OptType -> a, Text) -> a -> IO ()
 shouldResultIn (fn, x) = shouldParse $ fmap fn (parse x)
 
-shouldResultIn' :: (Lambda -> Maybe Lambda, Text) -> Text -> IO ()
+shouldResultIn' :: (Lambda OptType -> Maybe (Lambda OptType), Text) -> Text -> IO ()
 shouldResultIn' (fn, x) = shouldResultIn (fmap (Text.pack . show) . fn, x) . Just
 
 shouldReduceTo :: Text -> Text -> IO ()

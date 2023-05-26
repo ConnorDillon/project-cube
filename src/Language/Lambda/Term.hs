@@ -14,17 +14,22 @@ import qualified Data.Set as Set
 import Data.Text ( Text )
 import qualified Data.Text as Text
 
-data Lambda
+data Lambda a
   = Var Text
-  | Abs Text (Maybe Type) Lambda
-  | App Lambda Lambda
-  deriving (Eq, Ord)
+  | Abs Text a (Lambda a)
+  | App (Lambda a) (Lambda a)
+  deriving (Eq, Ord, Functor, Traversable, Foldable)
 
-instance Show Lambda where
+instance Show a => Show (Lambda a) where
   show l = case l of
     Var x -> Text.unpack x
     Abs v t e -> concat
-      ["(λ", Text.unpack v, maybe "" ((":" ++) . show) t, ".", show e, ")"] 
+      ["(λ"
+      , Text.unpack v
+      , let t' = show t in if null t' then t' else ":" ++ t'
+      , "."
+      , show e, ")"
+      ] 
     App x y -> concat ["(", show x, " ", show y, ")"]
 
 data Type
@@ -37,7 +42,7 @@ instance Show Type where
     Type x -> Text.unpack x
     Arrow x y -> concat ["(", show x, "->", show y, ")"]
 
-alphaConvert :: Text -> Lambda -> Maybe Lambda
+alphaConvert :: Text -> Lambda a -> Maybe (Lambda a)
 alphaConvert new (Abs old ty term) = Abs new ty <$> conv old new term
   where 
     conv old new term = case term of
@@ -52,19 +57,19 @@ alphaConvert new (Abs old ty term) = Abs new ty <$> conv old new term
       App x y -> App <$> conv old new x <*> conv old new y
 alphaConvert _ _ = Nothing
 
-alphaPrime :: Lambda -> Lambda
+alphaPrime :: Lambda a -> Lambda a
 alphaPrime l@(Abs v t e) = case alphaConvert v' l of
   Just x -> x
   Nothing -> alphaPrime $ Abs v' t e
   where v' = Text.snoc v '\''
 alphaPrime l = l
 
-freeVars :: Lambda -> Set Text
+freeVars :: Lambda a -> Set Text
 freeVars (Var x) = Set.singleton x
 freeVars (Abs v _ e) = Set.delete v (freeVars e)
 freeVars (App x y) = Set.union (freeVars x) (freeVars y)
 
-subs :: Text -> Lambda -> Lambda -> Lambda
+subs :: Text -> Lambda a -> Lambda a -> Lambda a
 subs s r (Var x) = if x == s
   then r
   else Var x
@@ -74,12 +79,12 @@ subs s r l@(Abs v t e)
   | otherwise = Abs v t $ subs s r e
 subs s r (App x y) = App (subs s r x) (subs s r y)
   
-betaReduceStep :: Lambda -> Maybe Lambda
+betaReduceStep :: Lambda a -> Maybe (Lambda a)
 betaReduceStep (App (Abs v _ e) x) = Just $ subs v x e
 betaReduceStep (App x@(App _ _) y) = do
   z <- betaReduceStep x
   return $ App z y
 betaReduceStep _ = Nothing
 
-betaReduce :: Lambda -> Lambda
+betaReduce :: Lambda a -> Lambda a
 betaReduce l = maybe l betaReduce (betaReduceStep l)
