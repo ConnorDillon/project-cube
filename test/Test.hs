@@ -2,13 +2,16 @@ module Main (main) where
 
 import Language.Lambda.Parser
 import Language.Lambda.Term
+import Language.Lambda.Type.Checker
 
+import Control.Monad ((>=>))
 import Data.Text ( Text )
 import qualified Data.Text as Text
 import Data.Void ( Void )
 import Test.Hspec ( hspec, describe, it, shouldBe )
 import Test.Hspec.Megaparsec ( shouldParse )
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 
 shouldParseTo :: Text -> Text -> IO ()
 shouldParseTo = shouldParse . fmap (Text.pack . show) . parse
@@ -21,6 +24,10 @@ shouldResultIn' (fn, x) = shouldResultIn (fmap (Text.pack . show) . fn, x) . Jus
 
 shouldReduceTo :: Text -> Text -> IO ()
 shouldReduceTo x = shouldParse (fmap (Text.pack . show . betaReduce) (parse x))
+
+shouldCheckTo :: (Context, Text) -> Maybe Text -> IO ()
+shouldCheckTo (c, x) = shouldParse parser
+  where parser = fmap (Text.pack . show) . (typed >=> check c) <$> parse x
 
 main :: IO ()
 main = hspec $ do
@@ -73,3 +80,22 @@ main = hspec $ do
     it "does automatic alpha conversion during beta reduction" $ do
       (betaReduceStep, "(λy x.y x) x") `shouldResultIn'` "(λx'.(x x'))"
       "(λy x.y x) x y" `shouldReduceTo` "(x y)"
+
+  describe "type checker" $ do
+    it "checks vars" $ do
+      (mempty, "x") `shouldCheckTo` Nothing
+      (Map.singleton "x" (Type "T"), "x") `shouldCheckTo` Just "T"
+    it "checks abstractions" $ do
+      (mempty, "λx:T.y") `shouldCheckTo` Nothing
+      (mempty, "λx:T.x") `shouldCheckTo` Just "(T->T)"
+    it "checks applications" $ do
+      let ctx = Map.fromList
+                  [ ("x", Arrow (Type "T") (Type "U"))
+                  , ("y", Type "T")
+                  , ("z", Type "U")
+                  ]
+      (mempty, "x y") `shouldCheckTo` Nothing
+      (ctx, "x z") `shouldCheckTo` Nothing
+      (ctx, "x y") `shouldCheckTo` Just "U"
+      (mempty, "(λx:T->T.x) λx:T.x") `shouldCheckTo` Just "(T->T)"
+

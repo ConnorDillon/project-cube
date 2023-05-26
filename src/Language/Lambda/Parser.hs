@@ -1,6 +1,6 @@
-module Language.Lambda.Parser ( Parser, OptType(..), parse ) where
+module Language.Lambda.Parser ( Parser, parse ) where
 
-import Language.Lambda.Term ( Lambda(..), Type(..) )
+import Language.Lambda.Term ( Lambda(..), Type(..), OptType(..) )
 import Language.Lambda.Parser.Lexer
 
 import Data.Text ( Text )
@@ -17,12 +17,6 @@ import Text.Megaparsec
       (<|>),
       MonadParsec(eof, try) )
 import qualified Text.Megaparsec as MP
-
-newtype OptType = OptType { getType :: Maybe Type }
-  deriving (Eq, Ord)
-
-instance Show OptType where
-  show = maybe "" show . getType
 
 keywords :: Set.Set Text
 keywords = Set.fromList ["let", "in"]

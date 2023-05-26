@@ -1,6 +1,7 @@
 module Language.Lambda.Term
   ( Lambda(..)
   , Type(..)
+  , OptType(..)
   , alphaConvert
   , alphaPrime
   , freeVars
@@ -28,7 +29,8 @@ instance Show a => Show (Lambda a) where
       , Text.unpack v
       , let t' = show t in if null t' then t' else ":" ++ t'
       , "."
-      , show e, ")"
+      , show e
+      , ")"
       ] 
     App x y -> concat ["(", show x, " ", show y, ")"]
 
@@ -41,6 +43,12 @@ instance Show Type where
   show t = case t of
     Type x -> Text.unpack x
     Arrow x y -> concat ["(", show x, "->", show y, ")"]
+
+newtype OptType = OptType { getType :: Maybe Type }
+  deriving (Eq, Ord)
+
+instance Show OptType where
+  show = maybe "" show . getType
 
 alphaConvert :: Text -> Lambda a -> Maybe (Lambda a)
 alphaConvert new (Abs old ty term) = Abs new ty <$> conv old new term

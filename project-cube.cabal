@@ -29,6 +29,7 @@ library
       Language.Lambda
       Language.Lambda.Term
       Language.Lambda.Parser
+      Language.Lambda.Type.Checker
     other-modules:
       Language.Lambda.Parser.Lexer
     hs-source-dirs:   src
