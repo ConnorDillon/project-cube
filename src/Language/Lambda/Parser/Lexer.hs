@@ -1,5 +1,5 @@
 module Language.Lambda.Parser.Lexer
-  ( Parser, lambdaSym, colon, arrow, dot, lparen, rparen, chars, let', bind, in' ) where
+  ( Parser, lambdaSym, piSym, colon, arrow, star, dot, lparen, rparen, chars, let', bind, in' ) where
 
 import Data.Text ( Text )
 import qualified Data.Text as Text
@@ -25,11 +25,17 @@ symbol = L.symbol sc
 lambdaSym :: Parser Text
 lambdaSym = symbol "\\" <|> "λ"
 
+piSym :: Parser Text
+piSym = symbol "#" <|> "Π"
+
 colon :: Parser Text
 colon = symbol ":"
 
 arrow :: Parser Text
 arrow = symbol "->"
+
+star :: Parser Text
+star = symbol "*"
 
 dot :: Parser Text
 dot = symbol "."

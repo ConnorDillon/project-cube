@@ -1,6 +1,7 @@
-module Language.Lambda.Type.Checker (Context, typed, check) where
+module Language.Lambda.Type.Checker (Context, check) where
 
 import Language.Lambda.Term
+    ( betaReduce, Lambda(..), Type, AbsType(Pi, La), subs )
 
 import Data.Map ( Map )
 import qualified Data.Map as Map
@@ -9,17 +10,27 @@ import qualified Data.Text as Text
 
 type Context = Map Text Type
 
-typed :: Lambda OptType -> Maybe (Lambda Type)
-typed = traverse getType
+check :: Context -> Lambda -> Either Text Type
+check c (Var v) = case Map.lookup v c of
+  Just t -> return t
+  Nothing -> Left $ mappend "Var not found in context:" v
+check c (Abs a v t e) = do
+  check c t
+  c' <- addToCtx v t c
+  t' <- check c' e
+  return $ case a of
+    La -> Abs Pi v t t'
+    Pi -> t'
+check c (App e1 e2) = do
+  t1 <- check c e1
+  t2 <- check c e2
+  case t1 of
+    Abs Pi v t e -> if betaReduce t == betaReduce t2 -- TO-DO: up to alpha equivalence
+      then return $ subs v e2 e
+      else Left $ mconcat ["Types differ: ", Text.pack $ show t, " ", Text.pack $ show t2]
+    _ -> Left $ mappend "Expected a pi type: " $ Text.pack $ show t1
 
-check :: Context -> Lambda Type -> Maybe Type
-check c (Var v) = Map.lookup v c
-check c (Abs v t l') = Arrow t <$> check (Map.insert v t c) l'
-check c (App l1 l2) = do
-  l1t <- check c l1
-  l2t <- check c l2
-  case l1t of
-    Arrow t1 t2 -> if t1 == l2t
-      then Just t2
-      else Nothing
-    _ -> Nothing
+addToCtx :: Text -> Lambda -> Context -> Either Text Context
+addToCtx v e c = if Map.member v c
+  then Left $ mappend "Var already in context:" v
+  else return $ Map.insert v (betaReduce e) c
