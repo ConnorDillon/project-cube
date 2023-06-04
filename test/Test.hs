@@ -24,9 +24,14 @@ shouldResultIn' (fn, x) = shouldResultIn (fmap (Text.pack . show) . fn, x) . Jus
 shouldReduceTo :: Text -> Text -> IO ()
 shouldReduceTo x = shouldParse (fmap (Text.pack . show . betaReduce) (parse x))
 
-shouldCheckTo :: (Context, Text) -> Text -> IO ()
-shouldCheckTo (c, x) = shouldParse parser . Right
-  where parser = fmap (Text.pack . show) . (check c) <$> parse x
+checkWith :: Rules -> Context -> Text -> Text -> IO ()
+checkWith r c x = shouldParse parser . Right
+  where parser = fmap (Text.pack . show) . (check r c) <$> parse x
+
+makeRules x = Rules
+  { axioms = Map.singleton "*" "BOX"
+  , rules = Set.union (Set.singleton ("*", "*")) (Set.fromList x)
+  }
 
 main :: IO ()
 main = hspec $ do
@@ -85,33 +90,30 @@ main = hspec $ do
 
   describe "type checker" $ do
     context "λ→" $ do
-      it "checks vars" $ do
-        (Map.singleton "x" (Var "T"), "x") `shouldCheckTo` "T"
-      it "checks abstractions" $ do
-        let ctx = Map.fromList [("T", Var "*")]
-        (ctx, "λx:T.x") `shouldCheckTo` "(T->T)"
+      let ctx = Map.fromList [("T", Var "*"), ("foo", Var "T")]
+          shouldCheck = checkWith (makeRules []) ctx
+      it "checks vars" $ "foo" `shouldCheck` "T"
+      it "checks abstractions" $ "λx:T.x" `shouldCheck` "(T->T)"
       it "checks applications" $ do
-        let ctx = Map.fromList [("x", Abs Pi "_" (Var "T") (Var "U")), ("y", Var "T")]
-        (ctx, "x y") `shouldCheckTo` "U"
+        "(λx:T.x) foo" `shouldCheck` "T"
+        "(λf:(Πx:T.T) x:T.f x) (λx:T.x) foo" `shouldCheck` "T"
     context "λ2" $ do
-      let ctx = Map.fromList [("*", Var "BOX"), ("Int", Var "*")]
-      it "checks abstractions" $ do
-        (ctx, "λa:*.λx:a.x") `shouldCheckTo` "(Πa:*.(a->a))"
-      it "checks applications" $ do
-        (ctx, "(λa:*.λx:a.x) Int") `shouldCheckTo` "(Int->Int)"
+      let ctx = Map.fromList [("Int", Var "*")]
+          shouldCheck = checkWith (makeRules [("BOX", "*")]) ctx
+      it "checks abstractions" $ "λa:*.λx:a.x" `shouldCheck` "(Πa:*.(a->a))"
+      it "checks applications" $ "(λa:*.λx:a.x) Int" `shouldCheck` "(Int->Int)"
     context "λω (weak)" $ do
-      let ctx = Map.fromList [("*", Var "BOX")]
-      it "checks abstractions" $ do
-        (ctx, "λa:*.a") `shouldCheckTo` "(*->*)"
-      it "checks applications" $ do
-        (ctx, "(λa:Πb:*.*.a) λb:*.b") `shouldCheckTo` "(*->*)"
+      let shouldCheck = checkWith (makeRules [("BOX", "BOX")]) mempty
+      it "checks abstractions" $ "λa:*.a" `shouldCheck` "(*->*)"
+      it "checks applications" $ "(λa:Πb:*.*.a) λb:*.b" `shouldCheck` "(*->*)"
     context "λP" $ do
       let ctx = Map.fromList [ ("Foo", Abs Pi "_" (Var "Int") (Var "*"))
                              , ("Int", Var "*")
                              , ("one", Var "Int") ]
+          shouldCheck = checkWith (makeRules [("*", "BOX")]) ctx
       it "checks abstractions" $ do
-        (ctx, "λa:Int.Int") `shouldCheckTo` "(Int->*)"
-        (ctx, "λa:Int.Foo") `shouldCheckTo` "(Int->(Int->*))"
+        "λa:Int.Int" `shouldCheck` "(Int->*)"
+        "λa:Int.Foo" `shouldCheck` "(Int->(Int->*))"
       it "checks applications" $ do
-        (ctx, "Foo one") `shouldCheckTo` "*"
-        (ctx, "λa:Int.Foo a") `shouldCheckTo` "(Int->*)"
+        "Foo one" `shouldCheck` "*"
+        "λa:Int.Foo a" `shouldCheck` "(Int->*)"
