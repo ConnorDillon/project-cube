@@ -22,7 +22,7 @@ shouldResultIn' :: (Lambda -> Maybe Lambda, Text) -> Text -> IO ()
 shouldResultIn' (fn, x) = shouldResultIn (fmap (Text.pack . show) . fn, x) . Just
 
 shouldReduceTo :: Text -> Text -> IO ()
-shouldReduceTo x = shouldParse (fmap (Text.pack . show . betaReduce) (parse x))
+shouldReduceTo x = shouldParse (fmap (Text.pack . show . betaNormalForm) (parse x))
 
 checkWith :: Rules -> Context -> Text -> Text -> IO ()
 checkWith r c x = shouldParse parser . Right
@@ -30,7 +30,7 @@ checkWith r c x = shouldParse parser . Right
 
 makeRules x = Rules
   { axioms = Map.singleton "*" "BOX"
-  , rules = Set.union (Set.singleton ("*", "*")) (Set.fromList x)
+  , rules = Map.union (Map.singleton ("*", "*") "*") (Map.fromList x)
   }
 
 main :: IO ()
@@ -65,8 +65,8 @@ main = hspec $ do
       "let f:(T -> T) x = x in f y" `shouldParseTo` "((λf:(T->T).(f y)) (λx.x))"
       "let f x:T = x in f y" `shouldParseTo` "((λf.(f y)) (λx:T.x))"
       "let f:(T -> T) x:T = x in f y" `shouldParseTo` "((λf:(T->T).(f y)) (λx:T.x))"
-      "λx:(Πx:T.T).x" `shouldParseTo` "(λx:(T->T).x)"
-      "λx:Πa:*.Πx:a.a.x" `shouldParseTo` "(λx:(Πa:*.(a->a)).x)"
+      "λx:(T->T).x" `shouldParseTo` "(λx:(T->T).x)"
+      "λx:Πa:*.(a->a).x" `shouldParseTo` "(λx:(Πa:*.(a->a)).x)"
 
   describe "interpreter" $ do
     it "does alpha conversion" $ do
@@ -76,16 +76,17 @@ main = hspec $ do
       (freeVars, "x") `shouldResultIn` Set.singleton "x"
       (freeVars, "λx.x y") `shouldResultIn` Set.singleton "y"
       (freeVars, "λx:a.x") `shouldResultIn` Set.singleton "a"
-    it "does one step beta reduction" $ do
-      (betaReduceStep, "(λx.x) y") `shouldResultIn'` "y"
-      (betaReduceStep, "(λx.x) (λx.x) y") `shouldResultIn'` "((λx.x) y)"
-      (betaReduceStep, "(λf.f x) λx.x") `shouldResultIn'` "((λx.x) x)"
-    it "does many step beta reduction" $ do
+    it "does beta reduction" $ do
+      (betaReduce, "(λx.x) y") `shouldResultIn'` "y"
+      (betaReduce, "(λx.x) (λx.x) y") `shouldResultIn'` "((λx.x) y)"
+      (betaReduce, "(λf.f x) λx.x") `shouldResultIn'` "((λx.x) x)"
+    it "reduces to beta normal form" $ do
       "x y" `shouldReduceTo` "(x y)"
       "(λx.x) (λy.y) z" `shouldReduceTo` "z"
       "let f x = x in let y = z in let foo = f y in foo" `shouldReduceTo` "z"
+      "λx.(λy.y) z" `shouldReduceTo` "(λx.z)"
     it "does automatic alpha conversion during beta reduction" $ do
-      (betaReduceStep, "(λy x.y x) x") `shouldResultIn'` "(λx'.(x x'))"
+      (betaReduce, "(λy x.y x) x") `shouldResultIn'` "(λx'.(x x'))"
       "(λy x.y x) x y" `shouldReduceTo` "(x y)"
 
   describe "type checker" $ do
@@ -99,18 +100,18 @@ main = hspec $ do
         "(λf:(Πx:T.T) x:T.f x) (λx:T.x) foo" `shouldCheck` "T"
     context "λ2" $ do
       let ctx = Map.fromList [("Int", Var "*")]
-          shouldCheck = checkWith (makeRules [("BOX", "*")]) ctx
+          shouldCheck = checkWith (makeRules [(("BOX", "*"), "*")]) ctx
       it "checks abstractions" $ "λa:*.λx:a.x" `shouldCheck` "(Πa:*.(a->a))"
       it "checks applications" $ "(λa:*.λx:a.x) Int" `shouldCheck` "(Int->Int)"
     context "λω (weak)" $ do
-      let shouldCheck = checkWith (makeRules [("BOX", "BOX")]) mempty
+      let shouldCheck = checkWith (makeRules [(("BOX", "BOX"), "BOX")]) mempty
       it "checks abstractions" $ "λa:*.a" `shouldCheck` "(*->*)"
-      it "checks applications" $ "(λa:Πb:*.*.a) λb:*.b" `shouldCheck` "(*->*)"
+      it "checks applications" $ "(λa:(*->*).a) λb:*.b" `shouldCheck` "(*->*)"
     context "λP" $ do
       let ctx = Map.fromList [ ("Foo", Abs Pi "_" (Var "Int") (Var "*"))
                              , ("Int", Var "*")
                              , ("one", Var "Int") ]
-          shouldCheck = checkWith (makeRules [("*", "BOX")]) ctx
+          shouldCheck = checkWith (makeRules [(("*", "BOX"), "BOX")]) ctx
       it "checks abstractions" $ do
         "λa:Int.Int" `shouldCheck` "(Int->*)"
         "λa:Int.Foo" `shouldCheck` "(Int->(Int->*))"

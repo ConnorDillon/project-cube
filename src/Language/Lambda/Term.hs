@@ -6,8 +6,9 @@ module Language.Lambda.Term
   , alphaPrime
   , freeVars
   , subs
-  , betaReduceStep
   , betaReduce
+  , betaNormalForm
+  , headNormalForm
   ) where
 
 import Data.Maybe (fromMaybe)
@@ -20,7 +21,7 @@ data Lambda
   = Var Text
   | Abs AbsType Text Type Lambda
   | App Lambda Lambda
-  deriving (Eq, Ord)
+  deriving Ord
 
 instance Show Lambda where
   show l = case l of
@@ -34,6 +35,15 @@ instance Show Lambda where
         type' = let t' = show t in if t' == "_" then "" else ":" ++ t'
         abst = concat ["(" , show a, Text.unpack v, type', ".", show e, ")"] 
     App x y -> concat ["(", show x, " ", show y, ")"]
+
+instance Eq Lambda where
+  (Var x) == (Var x') = x == x'
+  (App x y) == (App x' y') = x == x' && y == y'
+  x@(Abs a v t e) == y@(Abs a' v' t' e') = if v == v'
+    then a == a' && t == t' && e == e'
+    else case alphaConvert v y of
+      Just x' -> x == x'
+      Nothing -> alphaPrime x == y
 
 data AbsType = La | Pi
   deriving (Eq, Ord)
@@ -84,12 +94,20 @@ subs s r l@(Abs a v t e)
   | otherwise = Abs a v (subs s r t) (subs s r e)
 subs s r (App x y) = App (subs s r x) (subs s r y)
   
-betaReduceStep :: Lambda -> Maybe Lambda
-betaReduceStep (App (Abs La v _ e) x) = Just $ subs v x e
-betaReduceStep (App x@(App _ _) y) = do
-  z <- betaReduceStep x
+betaReduce :: Lambda -> Maybe Lambda
+betaReduce (App (Abs La v _ e) x) = Just $ subs v x e
+betaReduce (App x@(App _ _) y) = do
+  z <- betaReduce x
   return $ App z y
-betaReduceStep _ = Nothing
+betaReduce _ = Nothing
 
-betaReduce :: Lambda -> Lambda
-betaReduce l = maybe l betaReduce (betaReduceStep l)
+betaNormalForm :: Lambda -> Lambda
+betaNormalForm e = case betaReduce e of
+  Just e' -> betaNormalForm e'
+  Nothing -> case e of
+    App e1 e2 -> App (betaNormalForm e1) (betaNormalForm e2)
+    Abs a v t e -> Abs a v (betaNormalForm t) (betaNormalForm e)
+    _ -> e
+
+headNormalForm :: Lambda -> Lambda
+headNormalForm e = maybe e headNormalForm (betaReduce e)
